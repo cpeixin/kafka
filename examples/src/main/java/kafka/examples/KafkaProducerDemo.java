@@ -19,10 +19,14 @@ public class KafkaProducerDemo {
 
         Producer<String, String> producer = new KafkaProducer<>(props);
 
-        for (int i = 0; i < 100; i++)
-
-            producer.send(new ProducerRecord<String, String>("my-topic", Integer.toString(i), Integer.toString(i)));
-
+        System.out.println();
+        long startTime = System.currentTimeMillis ();
+        for (int i = 0; i < 100; i++){
+            // send 异步
+            producer.send(new ProducerRecord<String, String>("test", Integer.toString(i), Integer.toString(i)));
+        }
+        long endTime = System.currentTimeMillis (); //获取结束时间.
+        System.out.println ("程序运行时间：" + (endTime - startTime) + "ms");
         producer.close();
     }
 }
