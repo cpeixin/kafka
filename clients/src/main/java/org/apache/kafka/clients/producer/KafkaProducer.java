@@ -985,14 +985,20 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
         // Append callback takes care of the following:
         //  - call interceptors and user callback on completion
         //  - remember partition that is calculated in RecordAccumulator.append
+        //  封装成AppendCallbacks对象
         AppendCallbacks<K, V> appendCallbacks = new AppendCallbacks<K, V>(callback, this.interceptors, record);
 
         try {
+            // 验证生产者实例是否关闭
+            // 验证方式：sender线程是否存在以及是否在运行
+            // sender后台线程，负责向Kafka集群发送生产请求。该线程发出元数据请求以更新其集群视图，然后将生成请求发送到适当的节点。
             throwIfProducerClosed();
             // first make sure the metadata for the topic is available
             long nowMs = time.milliseconds();
             ClusterAndWaitTime clusterAndWaitTime;
             try {
+                // Wait for cluster metadata including partitions for the given topic to be available.
+                // 等待给定topic包含partitions集群元数据是否可用
                 clusterAndWaitTime = waitOnMetadata(record.topic(), record.partition(), nowMs, maxBlockTimeMs);
             } catch (KafkaException e) {
                 if (metadata.isClosed())
