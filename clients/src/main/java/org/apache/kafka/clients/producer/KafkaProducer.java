@@ -1028,21 +1028,29 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             // Try to calculate partition, but note that after this call it can be RecordMetadata.UNKNOWN_PARTITION,
             // which means that the RecordAccumulator would pick a partition using built-in logic (which may
             // take into account broker load, the amount of data produced to each partition, etc.).
+            // 尝试计算分区，但注意，在调用之后，它可以是RecordMetadata.UNKNOWN_PARTITION，这意味着RecordAccumulator将使用内置逻辑(可能会考虑broker负载、每个分区产生的数据量等)选择一个分区。
             int partition = partition(record, serializedKey, serializedValue, cluster);
 
+            // 直译：将record的header信息设置成只读
+            // https://cwiki.apache.org/confluence/display/KAFKA/KIP-82+-+Add+Record+Headers
+            // 对于 Producer，在 send 和 post 拦截器之后，它将变成一个只读的不可变实例。
             setReadOnly(record.headers());
             Header[] headers = record.headers().toArray();
 
             int serializedSize = AbstractRecords.estimateSizeInBytesUpperBound(apiVersions.maxUsableProduceMagic(),
                     compressionType, serializedKey, serializedValue, headers);
+            // 验证记录大小是否太大
             ensureValidRecordSize(serializedSize);
             long timestamp = record.timestamp() == null ? nowMs : record.timestamp();
 
             // A custom partitioner may take advantage on the onNewBatch callback.
+            // 一个布尔值，在创建新批处理和在尝试再次追加之前运行分区器的onNewBatch方法之前返回
             boolean abortOnNewBatch = partitioner != null;
 
             // Append the record to the accumulator.  Note, that the actual partition may be
             // calculated there and can be accessed via appendCallbacks.topicPartition.
+            // 将记录追加到累加器。注意，实际的分区可以在那里计算，并且可以通过appendCallbacks.topicPartition进行访问。
+            // 向累加器中添加一条记录，返回追加结果RecordAppendResult, 追加结果将包含 标记追加的批是否已满或创建了新批等异步元数据
             RecordAccumulator.RecordAppendResult result = accumulator.append(record.topic(), partition, timestamp, serializedKey,
                     serializedValue, headers, appendCallbacks, remainingWaitMs, abortOnNewBatch, nowMs, cluster);
             assert appendCallbacks.getPartition() != RecordMetadata.UNKNOWN_PARTITION;
@@ -1063,6 +1071,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             // unknown or the initially selected partition may be changed when the batch is closed
             // (as indicated by `abortForNewBatch`). Note that the `Sender` will refuse to dequeue
             // batches from the accumulator until they have been added to the transaction.
+            // 在成功地将分区追加到累加器之后，将分区添加到事务中(如果正在进行)。在此之前我们不能这样做，因为分区可能未知，或者当批处理关闭时，最初选择的分区可能被更改(由' abortForNewBatch '指示)。注意，' Sender '将拒绝从累加器中取出队列中的批次，直到它们被添加到事务中。
             if (transactionManager != null) {
                 transactionManager.maybeAddPartition(appendCallbacks.topicPartition());
             }

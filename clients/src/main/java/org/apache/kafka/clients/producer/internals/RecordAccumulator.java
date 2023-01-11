@@ -285,6 +285,7 @@ public class RecordAccumulator {
 
         // We keep track of the number of appending thread to make sure we do not miss batches in
         // abortIncompleteBatches().
+        // 我们跟踪追加线程的数量，以确保在abortIncompleteBatches()中不会遗漏批次。
         appendsInProgress.incrementAndGet();
         ByteBuffer buffer = null;
         if (headers == null) headers = Record.EMPTY_HEADERS;
@@ -306,6 +307,7 @@ public class RecordAccumulator {
                 }
 
                 // Now that we know the effective partition, let the caller know.
+                // 现在我们知道了有效分区，让调用者知道。
                 setPartition(callbacks, effectivePartition);
 
                 // check if we have an in-progress batch
@@ -314,7 +316,7 @@ public class RecordAccumulator {
                     // After taking the lock, validate that the partition hasn't changed and retry.
                     if (partitionChanged(topic, topicInfo, partitionInfo, dq, nowMs, cluster))
                         continue;
-
+                    // 尝试添加到一个ProducerBatch。如果已满，则返回null并创建一个新的批处理
                     RecordAppendResult appendResult = tryAppend(timestamp, key, value, headers, callbacks, dq, nowMs);
                     if (appendResult != null) {
                         // If queue has incomplete batches we disable switch (see comments in updatePartitionInfo).
@@ -325,6 +327,7 @@ public class RecordAccumulator {
                 }
 
                 // we don't have an in-progress record batch try to allocate a new batch
+                // 没有正在进行的记录批处理，请尝试分配一个新批处理
                 if (abortOnNewBatch) {
                     // Return a result that will cause another call to append.
                     return new RecordAppendResult(null, false, false, true, 0);
@@ -430,6 +433,8 @@ public class RecordAccumulator {
      *  resources like compression buffers. The batch will be fully closed (ie. the record batch headers will be written
      *  and memory records built) in one of the following cases (whichever comes first): right before send,
      *  if it is expired, or when the producer is closed.
+      *
+      *  尝试添加到一个ProducerBatch。如果已满，则返回null并创建一个新的batch。我们还关闭记录追加的批处理，以释放压缩缓冲区等资源。batch将完全关闭。在以下情况之一(以先到者为准)中建立内存记录:在发送之前，如果它过期，或当生产者关闭时。
      */
     private RecordAppendResult tryAppend(long timestamp, byte[] key, byte[] value, Header[] headers,
                                          Callback callback, Deque<ProducerBatch> deque, long nowMs) {
@@ -1060,6 +1065,7 @@ public class RecordAccumulator {
     /**
      * This function is only called when sender is closed forcefully. It will fail all the
      * incomplete batches and return.
+     * 此函数仅在强制关闭sender时调用。它将使所有未完成的批处理失败并返回。
      */
     public void abortIncompleteBatches() {
         // We need to keep aborting the incomplete batch until no thread is trying to append to
