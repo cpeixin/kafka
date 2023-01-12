@@ -12,6 +12,7 @@ public class KafkaProducerDemo {
         props.put("bootstrap.servers", "localhost:9092");
 
         props.put("linger.ms", 1);
+        props.put("batch.size", 10); // default： 16384
 
         props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
 
