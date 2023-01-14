@@ -35,6 +35,8 @@ import java.util.function.Supplier;
  *
  * The class keeps track of various bookkeeping information required for adaptive sticky partitioning
  * (described in detail in KIP-794).  There is one partitioner object per topic.
+ *
+ * 内置默认分区器。注意，这只是一个从RecordAccumulator直接使用的实用程序类，它没有实现Partitioner接口。该类跟踪自适应黏性分区所需的各种簿记信息(在KIP-794中详细描述)。每个主题有一个分区器对象。
  */
 public class BuiltInPartitioner {
     private final Logger log;
@@ -137,6 +139,17 @@ public class BuiltInPartitioner {
      *
      * @param cluster The cluster information (needed if there is no current partition)
      * @return sticky partition info object
+     *
+     *
+     *
+     * Peek currently chosen sticky partition。
+     * 此方法与isPartitionChanged和updatePartitionInfo结合使用。具体流程如下:
+     * 1. 调用peekCurrentPartitionInfo来确定要锁定哪个分区。
+     * 2. 锁定分区的批处理队列。
+     * 3.isPartitionChanged在锁定下，以确保没有人与我们竞争。
+     * 4. 将数据追加到缓冲区。
+     * 5. updatePartitionInfo更新产生的字节，可能切换分区。
+     * 步骤3-5在分区的批处理队列锁下是很重要的。
      */
     StickyPartitionInfo peekCurrentPartitionInfo(Cluster cluster) {
         StickyPartitionInfo partitionInfo = stickyPartitionInfo.get();

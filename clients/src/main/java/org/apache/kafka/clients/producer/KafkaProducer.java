@@ -1028,7 +1028,9 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             // Try to calculate partition, but note that after this call it can be RecordMetadata.UNKNOWN_PARTITION,
             // which means that the RecordAccumulator would pick a partition using built-in logic (which may
             // take into account broker load, the amount of data produced to each partition, etc.).
-            // 尝试计算分区，但注意，在调用之后，它可以是RecordMetadata.UNKNOWN_PARTITION，这意味着RecordAccumulator将使用内置逻辑(可能会考虑broker负载、每个分区产生的数据量等)选择一个分区。
+            // 计算给定记录的分区。如果记录有分区，则返回值.
+            // 否则如果指定了自定义分区器，则调用它来计算分区，否则尝试基于键计算分区。
+            // 如果没有键或键应被忽略，则返回RecordMetadata.UNKNOWN_PARTITION, 表示任何分区都可以使用(然后通过内置分区逻辑计算该分区,可能会考虑broker负载、每个分区产生的数据量等选择一个分区)。
             int partition = partition(record, serializedKey, serializedValue, cluster);
 
             // 直译：将record的header信息设置成只读
@@ -1131,7 +1133,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     private ClusterAndWaitTime waitOnMetadata(String topic, Integer partition, long nowMs, long maxWaitMs) throws InterruptedException {
         // add topic to metadata topic list if it is not there already and reset expiry
         Cluster cluster = metadata.fetch();
-
+        // 判断Topic是否是违法的
         if (cluster.invalidTopics().contains(topic))
             throw new InvalidTopicException(topic);
 

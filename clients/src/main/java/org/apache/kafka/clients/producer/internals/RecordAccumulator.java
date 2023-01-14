@@ -296,9 +296,12 @@ public class RecordAccumulator {
                 // availability and performance.  Note, that here we peek current partition before we hold the
                 // deque lock, so we'll need to make sure that it's not changed while we were waiting for the
                 // deque lock.
+                // 如果消息没有任何分区关联，那么我们将根据代理可用性和性能选择一个分区。注意，这里我们在持有deque锁之前查看了当前分区，所以我们需要确保在等待deque锁时它没有改变。
                 final BuiltInPartitioner.StickyPartitionInfo partitionInfo;
                 final int effectivePartition;
                 if (partition == RecordMetadata.UNKNOWN_PARTITION) {
+                    // 没有指定分区的情况
+                    // 调用peekCurrentPartitionInfo来确定要锁定哪个分区。
                     partitionInfo = topicInfo.builtInPartitioner.peekCurrentPartitionInfo(cluster);
                     effectivePartition = partitionInfo.partition();
                 } else {
@@ -307,19 +310,21 @@ public class RecordAccumulator {
                 }
 
                 // Now that we know the effective partition, let the caller know.
-                // 现在我们知道了有效分区，让调用者知道。
+                // 让调用者知道已经分配好的分区。
                 setPartition(callbacks, effectivePartition);
 
                 // check if we have an in-progress batch
+                // ConcurrentMap<Integer /*partition*/, Deque<ProducerBatch>> 判断effectivePartition分区是否已经存在对应的Deque
                 Deque<ProducerBatch> dq = topicInfo.batches.computeIfAbsent(effectivePartition, k -> new ArrayDeque<>());
                 synchronized (dq) {
-                    // After taking the lock, validate that the partition hasn't changed and retry.
+                    // After taking the lock, validate that the partition hasn't changed and retry.获取锁后，验证分区没有更改，然后重试。
                     if (partitionChanged(topic, topicInfo, partitionInfo, dq, nowMs, cluster))
                         continue;
                     // 尝试添加到一个ProducerBatch。如果已满，则返回null并创建一个新的批处理
                     RecordAppendResult appendResult = tryAppend(timestamp, key, value, headers, callbacks, dq, nowMs);
                     if (appendResult != null) {
                         // If queue has incomplete batches we disable switch (see comments in updatePartitionInfo).
+                        // 检查所有的batch是否满了
                         boolean enableSwitch = allBatchesFull(dq);
                         topicInfo.builtInPartitioner.updatePartitionInfo(partitionInfo, appendResult.appendedBytes, cluster, enableSwitch);
                         return appendResult;
@@ -1224,6 +1229,7 @@ public class RecordAccumulator {
         public final BuiltInPartitioner builtInPartitioner;
 
         public TopicInfo(LogContext logContext, String topic, int stickyBatchSize) {
+            // 内置默认分区器。注意，这只是一个从RecordAccumulator直接使用的实用程序类，它没有实现Partitioner接口。该类跟踪自适应黏性分区所需的各种簿记信息(在KIP-794中详细描述)。每个主题有一个分区器对象。
             builtInPartitioner = new BuiltInPartitioner(logContext, topic, stickyBatchSize);
         }
     }
